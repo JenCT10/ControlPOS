@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ControlPOS | Prototipo</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#172b42;font:16px Arial,sans-serif}header{background:#132d46;color:white;padding:20px}nav{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}nav a{color:white}main{margin:28px auto;width:min(92%,900px);background:white;padding:clamp(18px,4vw,40px);border-radius:12px}label{display:block;margin:14px 0}input,select,button{font:inherit;padding:8px}button{background:#006b60;color:white;border:0;border-radius:5px;cursor:pointer}a{color:#006b60}:focus-visible{outline:3px solid #ce7900;outline-offset:3px}table{width:100%;border-collapse:collapse}td,th{text-align:left;border-bottom:1px solid #dbe3eb;padding:9px}.scroll{overflow:auto}#mensaje{color:#9d2424}.tarjetas{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}.tarjetas p{background:#eef5f4;padding:16px}
+</style>
+<header><strong>ControlPOS</strong> · Prototipo con datos ficticios<nav id="menu"></nav></header>
+<main><div id="vista"></div><p id="mensaje" role="status"></p></main>
+<script>
+const vista=document.querySelector('#vista'), menu=document.querySelector('#menu');
+let rol='', filtro='';
+const equipos=[['POS-001','Disponible','—'],['POS-002','Asignado','Comercio Central'],['POS-003','En mantenimiento','—'],['POS-004','Inactivo','—']];
+const enlace=(ruta,texto)=>'<a href="#'+ruta+'">'+texto+'</a>';
+const campos=(s='')=>'<label>Serie <input required value="'+s+'"></label><label>Marca <input required value="'+(s?'PAX':'')+'"></label><label>Modelo <input required value="'+(s?'A920':'')+'"></label>';
+function render(){
+ let ruta=location.hash.slice(1);
+ if(ruta==='salir'){rol='';filtro=''}
+ if(!rol) ruta='login';
+ if(ruta==='usuarios'&&rol!=='Administrador') ruta='panel';
+ menu.innerHTML=rol?[['panel','Panel'],['inventario','Terminales'],['comercios','Comercios'],['movimientos','Movimientos'],['resumen','Resumen'],...(rol==='Administrador'?[['usuarios','Usuarios']]:[]),['salir','Cerrar sesión']].map(x=>enlace(...x)).join(''):'';
+ document.querySelector('#mensaje').textContent='';
+ const vistas={
+ login:'<h1>Inicio de sesión</h1><form id="acceso"><label>Usuario <input value="demo" required></label><label>Contraseña de ejemplo <input type="password" value="demo" required></label><label>Rol para la demostración <select><option>Encargado de inventario</option><option>Administrador</option></select></label><button>Entrar a la demostración</button></form>',
+ panel:'<h1>Panel principal</h1><p>'+rol+'</p><p>'+enlace('inventario','Consultar terminales')+' · '+enlace('nuevo','Registrar terminal')+'</p>',
+ inventario:'<h1>Inventario de terminales</h1><form id="filtro"><label>Serie, estado o comercio <input></label><button>Filtrar</button></form><p>'+enlace('nuevo','Registrar terminal')+'</p><div class="scroll"><table><thead><tr><th>Serie</th><th>Estado</th><th>Comercio</th><th>Acción</th></tr></thead><tbody>'+equipos.filter(e=>e.join(' ').toLowerCase().includes(filtro)).map(e=>'<tr><td>'+e.join('</td><td>')+'</td><td>'+enlace('editar-'+e[0],'Editar')+' · '+enlace('historial','Historial')+'</td></tr>').join('')+'</tbody></table></div>',
+ nuevo:'<h1>Registrar terminal</h1><form>'+campos()+'<p>Estado inicial de ejemplo: Disponible.</p><button>Simular registro</button></form>',
+ editar:'<h1>Editar terminal</h1><form>'+campos(equipos.find(e=>ruta==='editar-'+e[0])?.[0]||'')+'<button>Simular guardado</button></form>',
+ comercios:'<h1>Comercios</h1><p>COM-001 · Comercio Central · Pérez Zeledón</p><form><label>Código <input required></label><label>Nombre <input required></label><label>Ubicación <input required></label><button>Simular guardado</button></form>',
+ movimientos:'<h1>Movimientos</h1><form><label>Operación <select><option>Asignación</option><option>Devolución</option><option>Mantenimiento</option></select></label><label>Serie <select>'+equipos.map(e=>'<option>'+e[0]+'</option>').join('')+'</select></label><label>Fecha <input required type="date"></label><button>Simular movimiento</button></form>',
+ historial:'<h1>Historial de ejemplo</h1><p>POS-001 · Entrega al Comercio Sur el 01/10/2026 · Devolución el 03/10/2026.</p>'+enlace('inventario','Volver al inventario'),
+ resumen:'<h1>Resumen por estado</h1><div class="tarjetas">'+equipos.map(e=>'<p><strong>1</strong><br>'+e[1]+'</p>').join('')+'</div>',
+ usuarios:'<h1>Administración de usuarios</h1><p>Acceso reservado al administrador.</p><form><label>Usuario <input required></label><label>Rol <select><option>Encargado de inventario</option><option>Administrador</option></select></label><button>Simular guardado</button></form>'
+ };
+ vista.innerHTML=vistas[equipos.some(e=>ruta==='editar-'+e[0])?'editar':ruta==='editar'?'panel':ruta]||vistas.panel;
+}
+vista.addEventListener('submit',e=>{
+ e.preventDefault();
+ if(e.target.id==='acceso'){rol=e.target.querySelector('select').value;location.hash='panel';render();return}
+ if(e.target.id==='filtro'){filtro=e.target.querySelector('input').value.trim().toLowerCase();render();return}
+ document.querySelector('#mensaje').textContent='Operación simulada. Los datos de ejemplo no se modificaron.';
+});
+window.addEventListener('hashchange',render);render();
+</script>
+</html>
+
