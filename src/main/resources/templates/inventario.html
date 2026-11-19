@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Inventario | ControlPOS</title>
+    <link rel="stylesheet" th:href="@{/css/inventario.css}">
+</head>
+<body>
+<aside th:replace="~{menu :: menu('inventario')}"></aside>
+<div class="contenido">
+    <header class="barra">
+        <span>Inventario de POS</span>
+        <form method="post" th:action="@{/logout}">
+            <button class="salir" type="submit">Cerrar sesión</button>
+        </form>
+    </header>
+    <main>
+        <div class="encabezado">
+            <div><h1>Inventario de datáfonos</h1><p class="descripcion">Consulta los equipos y su estado de operación.</p></div>
+            <button class="filtrar" th:if="${demo and puedeCargar}" type="button" data-dialogo="cargar">＋ Cargar inventario</button>
+        </div>
+        <p th:if="${aviso}" role="status" th:text="${aviso}"></p>
+        <p th:if="${error}" role="alert" th:text="${error}"></p>
+        <section aria-labelledby="resumen">
+            <h2 id="resumen" class="solo-lector">Resumen de resultados</h2>
+            <dl class="resumen">
+                <div class="tarjeta total">
+                    <dt><span class="icono-resumen" aria-hidden="true">▤</span>Equipos encontrados</dt>
+                    <dd th:text="${#lists.size(terminales)}"></dd>
+                </div>
+                <div class="tarjeta" th:each="opcion : ${estados}" th:if="${opcion.name() == 'DISPONIBLE' or opcion.name() == 'EN_TRANSITO' or opcion.name() == 'ASIGNADO'}" th:classappend="${opcion.name()}">
+                    <dt><span class="icono-resumen" aria-hidden="true"></span><span th:text="${opcion.etiqueta}"></span></dt>
+                    <dd th:text="${totales.get(opcion)}"></dd>
+                </div>
+            </dl>
+        </section>
+        <dl class="resumen" th:if="${demo}">
+            <div class="tarjeta" th:each="entrada : ${porBodega}">
+                <dt><span class="icono-resumen" aria-hidden="true">▤</span><a th:href="@{/suministros(bodega=${entrada.key})}" th:text="${entrada.key}"></a></dt>
+                <dd th:text="${entrada.value}"></dd>
+            </div>
+        </dl>
+        <section class="panel" aria-labelledby="equipos">
+<nav class="pestanas" aria-label="Inventario"><a id="equipos" th:href="@{/terminales}" aria-current="page">Equipos</a><a th:if="${demo}" th:href="@{/suministros}">Bodegas</a><a th:href="@{/historial}">Historial de movimientos</a></nav>
+            <form class="filtros" method="get" th:action="@{/terminales}">
+                <label class="busqueda">Serie
+                    <input name="serie" th:value="${serie}" maxlength="60" placeholder="Buscar por serie…">
+                </label>
+                <label>Estado
+                    <select name="estado">
+                        <option value="">Todos los estados</option>
+                        <option th:each="opcion : ${estados}" th:value="${opcion.name()}"
+                                th:text="${opcion.etiqueta}" th:selected="${opcion == estado}"></option>
+                    </select>
+                </label>
+                <label>Comercio asignado
+                    <input name="comercio" th:value="${comercio}" maxlength="100" placeholder="Nombre o código">
+                </label>
+                <label th:if="${demo}">Bodega
+                    <select name="bodega">
+                        <option value="">Todas las bodegas</option>
+                        <option th:each="nombre : ${bodegas}" th:value="${nombre}" th:text="${nombre}" th:selected="${nombre == bodega}"></option>
+                    </select>
+                </label>
+                <div class="acciones">
+                    <button class="filtrar" type="submit">Filtrar</button>
+                    <a class="limpiar" th:href="@{/terminales}">Limpiar</a>
+                </div>
+            </form>
+            <div class="tabla" tabindex="0" role="region" aria-labelledby="equipos">
+                <table>
+                    <thead><tr><th scope="col">Serie</th><th scope="col">Marca</th><th scope="col">Modelo</th><th scope="col">Estado</th><th scope="col" th:if="${demo}">Bodega o comercio</th></tr></thead>
+                    <tbody>
+                        <tr th:each="terminal : ${terminales}">
+                            <th scope="row" th:text="${terminal.serie}"></th>
+                            <td th:text="${terminal.marca}"></td>
+                            <td th:text="${terminal.modelo}"></td>
+                            <td><span class="estado" th:classappend="${terminal.estado.name()}" th:text="${terminal.estado.etiqueta}"></span></td>
+                            <td th:if="${demo}" th:text="${ubicaciones.get(terminal.serie)}"></td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(terminales)}">
+                            <td class="vacio" th:colspan="${demo ? 5 : 4}">No se encontraron equipos con estos filtros.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</div>
+<th:block th:if="${demo and puedeCargar}" th:insert="~{cargas :: ventanas}"></th:block>
+<script defer th:src="@{/js/dialogos.js}"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${titulo + ' | ControlPOS'}">ControlPOS</title>
+    <link rel="stylesheet" th:href="@{/css/inventario.css}">
+</head>
+<body>
+<aside th:replace="~{menu :: menu(${seccion})}"></aside>
+<div class="contenido">
+    <header class="barra">
+        <span th:text="${titulo}"></span>
+        <form method="post" th:action="@{/logout}">
+            <button class="salir" type="submit">Cerrar sesión</button>
+        </form>
+    </header>
+    <main>
+        <div class="encabezado"><h1 th:text="${titulo}"></h1></div>
+        <section class="panel">
+            <h2><span>En desarrollo</span></h2>
+            <p class="contenido-modulo" th:text="${descripcion}"></p>
+        </section>
+    </main>
+</div>
+</body>
+</html>

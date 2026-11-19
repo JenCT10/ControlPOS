@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Historial de movimientos | ControlPOS</title>
+    <link rel="stylesheet" th:href="@{/css/inventario.css}">
+</head>
+<body>
+<aside th:replace="~{menu :: menu('inventario')}"></aside>
+<div class="contenido">
+    <header class="barra"><span>Inventario de POS</span>
+        <form method="post" th:action="@{/logout}"><button class="salir">Cerrar sesión</button></form>
+    </header>
+    <main>
+        <div class="encabezado">
+            <h1>Historial de movimientos</h1>
+            <a class="limpiar" th:href="@{/terminales}">← Volver al inventario</a>
+        </div>
+        <section class="panel historial">
+            <nav class="pestanas" aria-label="Categoría del movimiento">
+                <a th:href="@{/historial(categoria='pos')}" th:aria-current="${!materiales ? 'page' : null}">Equipos POS</a>
+                <a th:href="@{/historial(categoria='materiales')}" th:aria-current="${materiales ? 'page' : null}">Materiales</a>
+            </nav>
+            <form class="filtros" method="get" th:action="@{/historial}">
+                <input type="hidden" name="categoria" th:value="${categoria}">
+                <label class="busqueda"><span class="solo-lector">Buscar</span>
+                    <input name="buscar" th:value="${buscar}" th:placeholder="${materiales ? 'Buscar artículo o referencia' : 'Buscar serie o detalle'}">
+                </label>
+                <label><span class="solo-lector">Bodega</span>
+                    <select name="bodega"><option value="">Todas las bodegas</option>
+                        <option th:each="opcion : ${bodegas}" th:value="${opcion}" th:text="${opcion}" th:selected="${opcion == bodega}"></option>
+                    </select>
+                </label>
+                <button class="aplicar">Aplicar</button>
+                <a class="limpiar" th:href="@{/historial(categoria=${categoria})}">Limpiar</a>
+                <details th:open="${fecha != null or !tipo.isEmpty()}">
+                    <summary>Más filtros</summary>
+                    <div class="filtros-fecha">
+                        <label>Fecha <input type="date" name="fecha" th:value="${fecha}"></label>
+                        <label>Movimiento
+                            <select name="tipo"><option value="">Todos los movimientos</option>
+                                <option th:each="opcion : ${tipos}" th:value="${opcion}" th:text="${opcion}" th:selected="${opcion == tipo}"></option>
+                            </select>
+                        </label>
+                    </div>
+                </details>
+            </form>
+            <p class="vacio contenido-modulo" th:if="${filas.isEmpty()}">No se encontraron movimientos.</p>
+            <div class="tabla" th:unless="${filas.isEmpty()}">
+                <table>
+                    <thead><tr><th scope="col">Fecha</th><th scope="col" th:text="${materiales ? 'Artículo' : 'Serie o código interno'}"></th>
+                        <th scope="col">Movimiento</th><th scope="col">Bodega</th><th scope="col">Detalle</th></tr></thead>
+                    <tbody><tr th:each="fila : ${filas}">
+                        <td><span th:text="${fila.fecha}"></span><small th:text="${fila.hora}"></small></td>
+                        <th scope="row" th:text="${fila.articulo}"></th>
+                        <td><span class="estado MANTENIMIENTO" th:text="${fila.detalle}"></span></td>
+                        <td th:text="${fila.bodega}"></td>
+                        <td th:text="${'Gestión #' + fila.gestion + ' · Aplicó: ' + fila.responsable + (materiales ? ' · Unidades: ' + fila.cantidad : '')}"></td>
+                    </tr></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Iniciar sesión | ControlPOS</title>
+    <link rel="stylesheet" th:href="@{/css/login.css}">
+</head>
+<body>
+
+<main>
+    <header class="marca"><span class="datafono" aria-hidden="true"></span><strong>ControlPOS</strong></header>
+    <h1>Iniciar sesión</h1>
+    <p th:if="${demoSinClave}" role="alert">La cuenta de demostración requiere una contraseña configurada al arrancar.</p>
+    <p th:if="${param.error != null and demoSinClave != true}" role="alert">No se pudo iniciar sesión. Revisa el usuario y la contraseña.</p>
+    <p th:if="${param.logout}" role="status">Sesión cerrada.</p>
+    <form method="post" th:action="@{/login}">
+        <label>Usuario <input name="username" autocomplete="username" required maxlength="60"></label>
+        <label>Contraseña <input name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Entrar</button>
+    </form>
+</main>
+</body>
+</html>

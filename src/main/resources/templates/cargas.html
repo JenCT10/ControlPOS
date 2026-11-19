@@ -1,0 +1,42 @@
+<th:block xmlns:th="http://www.thymeleaf.org" th:fragment="ventanas">
+    <dialog id="cargar" class="ventana" aria-labelledby="titulo-carga">
+        <header><h2 id="titulo-carga">Cargar inventario</h2><p>Elige qué quieres agregar.</p></header>
+        <div class="ventana-cuerpo opciones-carga">
+            <button type="button" data-dialogo="cargar-pos"><strong>Cargar equipos POS</strong><span>Selecciona una bodega y registra un datáfono.</span></button>
+            <button type="button" data-dialogo="cargar-material"><strong>Cargar materiales</strong><span>Selecciona una bodega e ingresa las unidades.</span></button>
+        </div>
+        <form method="dialog" class="ventana-pie"><button class="salir">Cancelar</button></form>
+    </dialog>
+    <dialog id="cargar-pos" class="ventana" aria-labelledby="titulo-pos">
+        <header><h2 id="titulo-pos">Cargar equipos POS</h2></header>
+        <form method="post" th:action="@{/solicitudes}">
+            <div class="ventana-cuerpo">
+                <input type="hidden" name="tipo" value="INGRESO_POS">
+                <label th:replace="~{cargas :: selectorBodega}"></label>
+                <label>Serie <input name="serie" maxlength="60" required></label>
+                <label>Marca <input name="marca" maxlength="60" required></label>
+                <label>Modelo <input name="modelo" maxlength="60" required></label>
+            </div>
+            <footer class="ventana-pie"><button class="salir" formmethod="dialog" formnovalidate>Cancelar</button><button class="filtrar">Cargar</button></footer>
+        </form>
+    </dialog>
+    <dialog id="cargar-material" class="ventana" aria-labelledby="titulo-material">
+        <header><h2 id="titulo-material">Cargar materiales</h2></header>
+        <form method="post" th:action="@{/solicitudes}">
+            <div class="ventana-cuerpo">
+                <input type="hidden" name="tipo" value="INGRESO_SUMINISTRO">
+                <label th:replace="~{cargas :: selectorBodega}"></label>
+                <label>Material <input name="material" list="materiales-carga" maxlength="80" required></label>
+                <datalist id="materiales-carga"><option value="Tramo de cable"><option value="RJ45"><option value="DB9 hembra"><option value="Cobertor"><option value="Cable Manhattan"></datalist>
+                <label>Unidades <input name="cantidad" type="number" min="1" max="100000" required></label>
+            </div>
+            <footer class="ventana-pie"><button class="salir" formmethod="dialog" formnovalidate>Cancelar</button><button class="filtrar">Registrar carga</button></footer>
+        </form>
+    </dialog>
+</th:block>
+<label xmlns:th="http://www.thymeleaf.org" th:fragment="selectorBodega">Bodega
+    <select name="comercio" required>
+        <option value="">Selecciona una bodega</option>
+        <option th:each="nombre : ${bodegas}" th:if="${administrador or nombre == usuarioActual}" th:value="${nombre}" th:text="${nombre}"></option>
+    </select>
+</label>

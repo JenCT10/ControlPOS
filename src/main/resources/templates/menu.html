@@ -1,0 +1,12 @@
+<aside class="lateral" xmlns:th="http://www.thymeleaf.org" th:fragment="menu(seccion)">
+    <a class="marca" th:href="@{/terminales}">
+        <span class="datafono" aria-hidden="true"></span> ControlPOS
+    </a>
+    <nav aria-label="Navegación principal">
+        <a th:href="@{/terminales}" th:aria-current="${seccion == 'inventario' ? 'page' : null}">Inventario</a>
+        <a th:href="@{/comercios}" th:aria-current="${seccion == 'comercios' ? 'page' : null}">Comercios</a>
+        <a th:href="@{/gestiones}" th:aria-current="${seccion == 'gestiones' ? 'page' : null}">Gestiones</a>
+        <a th:if="${revisor}" th:href="@{/aprobaciones}" th:aria-current="${seccion == 'aprobaciones' ? 'page' : null}">Aprobaciones</a>
+        <a th:if="${administrador}" th:href="@{/usuarios}" th:aria-current="${seccion == 'usuarios' ? 'page' : null}">Usuarios</a>
+    </nav>
+</aside>

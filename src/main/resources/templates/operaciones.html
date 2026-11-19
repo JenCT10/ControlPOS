@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Operaciones | ControlPOS</title>
+    <link rel="stylesheet" th:href="@{/css/inventario.css}">
+</head>
+<body>
+<aside th:replace="~{menu :: menu(${seccion == 'suministros' ? 'inventario' : seccion})}"></aside>
+<div class="contenido">
+<header class="barra"><span>ControlPOS · Demostración</span>
+    <form method="post" th:action="@{/logout}"><button class="salir">Cerrar sesión</button></form>
+</header>
+<main>
+    <p th:if="${aviso}" role="status" th:text="${aviso}"></p>
+    <p th:if="${error}" role="alert" th:text="${error}"></p>
+    <div class="encabezado" th:if="${seccion == 'suministros'}">
+        <div><h1>Administración de bodegas</h1><p class="descripcion">Consulta los equipos y materiales de cada bodega.</p></div>
+        <button class="filtrar" th:if="${administrador}" data-dialogo="crear-bodega">＋ Crear bodega</button>
+    </div>
+    <section th:if="${seccion == 'suministros'}" class="panel">
+        <nav class="pestanas" aria-label="Inventario"><a th:href="@{/terminales}">Volver al inventario</a></nav>
+        <div class="contenido-modulo">
+            <div class="tabla"><table>
+                <thead><tr><th>Bodega</th><th>Acciones</th></tr></thead>
+                <tbody><tr th:each="entrada : ${bodegas}">
+                    <th scope="row" th:text="${entrada.key}"></th>
+                    <td><a class="limpiar" th:href="@{/suministros(bodega=${entrada.key})}">Ver bodega</a></td>
+                </tr></tbody>
+            </table></div>
+            <div th:if="${bodegas.containsKey(bodega)}">
+                <h3 th:text="${bodega}"></h3><a class="limpiar" th:href="@{/suministros}">← Volver a bodegas</a>
+                <h4>Equipos POS</h4>
+                <ul><li th:each="e : ${equiposBodega}" th:text="${e.terminal.serie + ' · ' + e.terminal.modelo + ' · ' + e.terminal.estado.etiqueta}"></li></ul>
+                <p th:if="${equiposBodega.isEmpty()}">Sin equipos en esta bodega.</p>
+                <h4>Materiales</h4>
+                <ul><li th:each="articulo : ${bodegas.get(bodega)}" th:text="${articulo.key + ' · ' + articulo.value}"></li></ul>
+                <p th:if="${bodegas.get(bodega).isEmpty()}">Sin materiales en esta bodega.</p>
+                <form class="filtros" th:if="${puedeSolicitar and (administrador or usuarioActual == bodega)}" method="post" th:action="@{/solicitudes}">
+                    <input type="hidden" name="comercio" th:value="${bodega}">
+                    <label>Tipo <select name="tipo"><option value="TRASLADO_POS">Equipo POS</option><option value="TRASLADO_MATERIAL">Material</option></select></label>
+                    <label>Bodega destino <select name="reemplazo" required>
+                        <option th:each="entrada : ${bodegas}" th:if="${entrada.key != bodega}" th:value="${entrada.key}" th:text="${entrada.key}"></option>
+                    </select></label>
+                    <label>Serie del equipo <input name="serie" maxlength="60"></label>
+                    <label>Nombre del material <input name="material" maxlength="80"></label>
+                    <label>Cantidad de material <input name="cantidad" type="number" min="1" max="100000"></label>
+                    <button class="filtrar">Registrar traslado</button>
+                </form>
+            </div>
+        </div>
+    </section>
+    <section th:if="${seccion == 'comercios' and puedeSolicitar}" class="panel">
+        <h2><span>Agregar comercio</span></h2>
+        <form class="filtros" method="post" th:action="@{/solicitudes}">
+            <input type="hidden" name="tipo" value="ALTA_COMERCIO">
+            <label>Código <input name="comercio" maxlength="30" required></label>
+            <label>Nombre <input name="modelo" maxlength="100" required></label>
+            <button class="filtrar">Agregar comercio</button>
+        </form>
+    </section>
+    <section th:if="${seccion == 'comercios'}" class="panel panel-separado">
+        <h2><span>Comercios registrados</span></h2>
+        <div class="tabla"><table>
+            <thead><tr><th scope="col">Código</th><th scope="col">Comercio</th><th scope="col">Estado</th></tr></thead>
+            <tbody>
+                <tr th:each="comercio : ${comercios}">
+                    <th scope="row" th:text="${comercio.key}"></th><td th:text="${comercio.value}"></td><td>Registrado</td>
+                </tr>
+                <tr th:each="alta : ${altasComercio}">
+                    <th scope="row" th:text="${alta.datos.comercio}"></th>
+                    <td th:text="${alta.datos.modelo}"></td><td th:text="${alta.estado}"></td>
+                </tr>
+            </tbody>
+        </table></div>
+    </section>
+    <section th:if="${seccion == 'gestiones' and puedeSolicitar}" class="panel formulario-gestion">
+        <h2><span>Crear gestión</span></h2>
+        <form class="gestion-form" method="post" th:action="@{/solicitudes}">
+            <label>Comercio
+                <select name="comercio" required>
+                    <option value="">Selecciona un comercio</option>
+                    <option th:each="c : ${comercios}" th:value="${c.key}" th:text="${c.key + ' · ' + c.value}"></option>
+                </select>
+            </label>
+            <label>Tipo de gestión
+                <select name="tipo" required>
+                    <option value="">Selecciona una opción</option>
+                    <option value="INSTALACION">Instalación</option>
+                    <option value="ENCOMIENDA">Encomienda</option>
+                    <option value="RETIRO">Retiro</option>
+                    <option value="CAMBIO">Cambio de datáfono</option>
+                </select>
+            </label>
+            <label>Serie del POS
+                <input name="serie" maxlength="1000" list="series-disponibles" autocomplete="off">
+                <small data-ayuda-serie>Selecciona el tipo de gestión.</small>
+            </label>
+            <label data-campo="reemplazo" hidden>Serie del reemplazo
+                <input name="reemplazo" maxlength="60" list="series-disponibles" autocomplete="off" disabled>
+            </label>
+            <datalist id="series-disponibles">
+                <option th:each="pos : ${seriesDisponibles}" th:value="${pos.serie}" th:label="${pos.marca + ' ' + pos.modelo}"></option>
+            </datalist>
+            <fieldset data-campo="suministros" hidden disabled>
+                <legend>Suministros y accesorios</legend>
+                <label>Suministro <input name="material" maxlength="80" placeholder="Ej. Cable de datos"></label>
+                <label>Cantidad <input name="cantidad" type="number" min="1" max="100000"></label>
+            </fieldset>
+            <div class="acciones"><button class="filtrar">Registrar gestión</button></div>
+        </form>
+    </section>
+    <section th:if="${seccion == 'gestiones' or seccion == 'aprobaciones'}" class="panel">
+        <h2><span th:text="${seccion == 'gestiones' ? 'Gestiones' : 'Aprobaciones'}"></span></h2>
+        <article class="contenido-modulo" th:each="s : ${solicitudes}"
+                 th:if="${seccion == 'gestiones' or s.estado == 'Pendiente'}">
+            <h3 th:text="${'#' + s.id + ' · ' + s.datos.tipo + ' · ' + s.estado}"></h3>
+            <p th:text="${'Solicitante: ' + s.solicitante + (s.revisor.isEmpty() ? '' : ' · Revisó: ' + s.revisor)}"></p>
+            <p th:text="${s.datos.comercio + ' ' + s.datos.serie + ' ' + s.datos.reemplazo + ' ' + s.datos.material + (s.datos.cantidad > 0 ? ' × ' + s.datos.cantidad : '')}"></p>
+            <p th:if="${!s.motivo.isEmpty()}" th:text="${s.motivo}"></p>
+            <ul th:unless="${s.movimientos.isEmpty()}">
+                <li th:each="m : ${s.movimientos}" th:text="${m.categoria + ' · ' + m.articulo + ' · ' + m.detalle + ' · ' + m.bodega + ' · ' + m.cantidad}"></li>
+            </ul>
+            <form class="filtros" th:if="${seccion == 'aprobaciones' and s.solicitante != usuarioActual}"
+                  method="post" th:action="@{/aprobaciones/{id}(id=${s.id})}">
+                <label>Motivo si se rechaza <input name="motivo" maxlength="250"></label>
+                <button class="filtrar" name="aprobar" value="true">Aprobar</button>
+                <button class="salir" name="aprobar" value="false">Rechazar</button>
+            </form>
+            <form class="filtros" th:if="${seccion == 'gestiones' and puedeSolicitar and s.solicitante == usuarioActual and s.estado == 'Aprobada' and s.datos.tipo.name() != 'ANULACION' and s.datos.tipo.name() != 'TRASLADO_MATERIAL' and !s.movimientos.isEmpty()}"
+                  method="post" th:action="@{/solicitudes}">
+                <input type="hidden" name="tipo" value="ANULACION">
+                <input type="hidden" name="origen" th:value="${s.id}">
+                <label th:each="m,i : ${s.movimientos}"><input type="checkbox" name="articulos" th:value="${i.count}"><span th:text="${m.articulo}"></span></label>
+                <button class="filtrar">Solicitar anulación</button>
+                <small>Selecciona artículos para una anulación parcial. Sin selección se solicita la anulación total.</small>
+            </form>
+        </article>
+        <p class="contenido-modulo" th:if="${solicitudes.isEmpty()}">Todavía no hay solicitudes.</p>
+    </section>
+</main>
+</div>
+<dialog th:if="${seccion == 'suministros' and administrador}" id="crear-bodega" class="ventana" aria-labelledby="titulo-bodega">
+    <header><h2 id="titulo-bodega">Crear bodega</h2></header>
+    <form method="post" th:action="@{/bodegas}">
+        <div class="ventana-cuerpo"><label>Nombre de la bodega <input name="nombre" maxlength="28" required></label></div>
+        <footer class="ventana-pie"><button class="salir" formmethod="dialog" formnovalidate>Cancelar</button><button class="filtrar">Crear bodega</button></footer>
+    </form>
+</dialog>
+<script defer th:src="@{/js/dialogos.js}"></script>
+<script th:if="${seccion == 'gestiones' and puedeSolicitar}" defer th:src="@{/js/gestiones.js}"></script></body>
+</html>

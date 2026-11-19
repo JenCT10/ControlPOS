@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Usuarios | ControlPOS</title>
+    <link rel="stylesheet" th:href="@{/css/inventario.css}">
+    <script defer th:src="@{/js/dialogos.js}"></script>
+    <script defer th:src="@{/js/usuarios.js}"></script>
+</head>
+<body>
+<aside th:replace="~{menu :: menu('usuarios')}"></aside>
+<div class="contenido">
+    <header class="barra"><span>Usuarios</span>
+        <form method="post" th:action="@{/logout}"><button class="salir">Cerrar sesión</button></form>
+    </header>
+    <main>
+        <div class="encabezado"><h1>Usuarios</h1><button type="button" class="filtrar" data-dialogo="crear-usuario">+ Crear usuario</button></div>
+        <p th:if="${aviso}" role="status" th:text="${aviso}"></p>
+        <p th:if="${error != null and edicion == null}" role="alert" th:text="${error}"></p>
+        <dialog class="ventana ficha-usuario" th:if="${detalle != null}" data-abrir aria-labelledby="titulo-detalle">
+            <header><h2 id="titulo-detalle">Información del usuario</h2></header>
+            <div class="ventana-cuerpo">
+                <div class="perfil-usuario">
+                    <span class="avatar-usuario" aria-hidden="true" th:text="${#strings.substring(detalle.nombre,0,1)}"></span>
+                    <div><strong th:text="${detalle.nombre}"></strong><small th:text="${detalle.usuario}"></small></div>
+                </div>
+                <h3>Datos de la cuenta</h3>
+                <dl class="detalle-usuario">
+                    <div><dt>Nombre completo</dt><dd th:text="${detalle.nombre}"></dd></div>
+                    <div><dt>Nombre de usuario</dt><dd th:text="${detalle.usuario}"></dd></div>
+                    <div><dt>Rol</dt><dd th:text="${detalle.etiquetaRol}"></dd></div>
+                </dl>
+            </div>
+            <div class="ventana-pie">
+                <form method="dialog"><button class="salir" autofocus>Regresar</button></form>
+                <a class="filtrar" th:if="${detalle.usuario != actual}" th:href="@{/usuarios(editar=${detalle.usuario})}">Modificar</a>
+            </div>
+        </dialog>
+        <section class="panel cuentas-usuarios">
+            <h2><span>Cuentas registradas</span></h2>
+            <div class="controles-usuarios"><label>Mostrar <select id="cantidad-usuarios"><option>10</option><option>25</option><option>50</option></select> registros</label><label class="buscar-usuario">Buscar <input type="search" id="buscar-usuario" placeholder="Nombre, usuario o rol"></label></div>
+            <div class="tabla">
+                <table>
+                    <thead><tr><th scope="col">Nombre completo</th><th scope="col">Usuario</th><th scope="col">Rol</th><th scope="col">Acciones</th></tr></thead>
+                    <tbody>
+                        <tr data-cuenta th:each="cuenta, fila : ${cuentas}">
+                            <th scope="row" th:text="${cuenta.nombre}"></th>
+                            <td><span class="avatar-usuario" aria-hidden="true" th:text="${#strings.substring(cuenta.nombre,0,1)}"></span> <span th:text="${cuenta.usuario}"></span></td>
+                            <td th:text="${cuenta.etiquetaRol}"></td>
+                            <td>
+                                <div class="acciones-usuario">
+                                    <a class="salir accion-usuario" th:href="@{/usuarios(ver=${cuenta.usuario})}"
+                                       title="Ver información" th:aria-label="|Ver información de ${cuenta.usuario}|"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"/><circle cx="12" cy="12" r="2.5"/></svg></a>
+                                    <a class="salir accion-usuario" th:if="${cuenta.usuario != actual}"
+                                       th:href="@{/usuarios(editar=${cuenta.usuario})}"
+                                       title="Editar usuario" th:aria-label="|Editar ${cuenta.usuario}|"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m4 16-.5 4 4-.5L20 7l-3-3L4 16Zm11-10 3 3"/></svg></a>
+                                    <button class="salir accion-usuario eliminar-usuario" type="button" th:if="${cuenta.usuario != actual}"
+                                            th:data-dialogo="|eliminar-usuario-${fila.index}|" title="Eliminar usuario"
+                                            th:aria-label="|Eliminar ${cuenta.usuario}|"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 6h16M9 6V4h6v2m3 0-1 14H7L6 6m4 4v6m4-6v6"/></svg></button>
+                                </div>
+                                <dialog class="ventana" th:if="${cuenta.usuario != actual}" th:id="|eliminar-usuario-${fila.index}|">
+                                    <div class="ventana-cuerpo">
+                                        <h3>Eliminar usuario</h3>
+                                        <p th:text="|¿Deseas eliminar la cuenta de ${cuenta.nombre} (${cuenta.usuario})?|"></p>
+                                        <div class="acciones-usuario">
+                                            <form method="dialog"><button class="salir" autofocus>Cancelar</button></form>
+                                            <form method="post" th:action="@{/usuarios/{login}/eliminar(login=${cuenta.usuario})}">
+                                                <button class="filtrar">Eliminar</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </dialog>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pie-usuarios">
+                <span id="resumen-usuarios" role="status"></span>
+                <nav aria-label="Páginas de usuarios">
+                    <button type="button" class="salir" id="usuarios-anterior">Anterior</button>
+                    <span id="pagina-usuarios"></span>
+                    <button type="button" class="salir" id="usuarios-siguiente">Siguiente</button>
+                </nav>
+            </div>
+        </section>
+        <dialog class="ventana" id="crear-usuario" aria-labelledby="titulo-crear">
+            <header><h2 id="titulo-crear">Crear usuario</h2></header>
+            <div th:replace="~{usuarios :: formularioCuenta(${null})}"></div>
+        </dialog>
+        <dialog class="ventana" th:if="${edicion != null}" data-abrir aria-labelledby="titulo-edicion">
+            <header><h2 id="titulo-edicion">Editar usuario</h2></header>
+            <div th:replace="~{usuarios :: formularioCuenta(${edicion})}"></div>
+        </dialog>
+    </main>
+</div>
+<template th:remove="all">
+            <form th:fragment="formularioCuenta(edicion)" class="ventana-cuerpo" method="post" th:action="@{/usuarios}">
+                <p th:if="${edicion != null and error != null}" role="alert" th:text="${error}"></p>
+                <input type="hidden" name="loginOriginal" th:if="${edicion != null}" th:value="${edicion.usuario}">
+                <label>Nombre completo <input name="nombre" maxlength="120" required th:value="${edicion?.nombre}"></label>
+                <label>Rol <select name="rol" required>
+                    <option value="SOPORTISTA" th:selected="${edicion?.rol == 'SOPORTISTA'}">Soportista</option>
+                    <option value="SUPERVISOR" th:selected="${edicion?.rol == 'SUPERVISOR'}">Supervisor</option>
+                    <option value="ADMINISTRADOR" th:selected="${edicion?.rol == 'ADMINISTRADOR'}">Administrador</option>
+                </select></label>
+                <label>Nombre de usuario <input name="login" minlength="3" maxlength="60" pattern="[a-zA-Z0-9._\-]+" required
+                                                 th:value="${edicion?.usuario}"></label>
+                <label><span th:text="${edicion == null ? 'Contraseña' : 'Nueva contraseña (opcional)'}"></span>
+                    <input type="password" name="clave" minlength="12" autocomplete="new-password" th:required="${edicion == null}">
+                </label>
+                <div class="acciones-usuario">
+                    <button class="filtrar"
+                        th:text="${edicion == null ? 'Crear usuario' : 'Guardar cambios'}"></button>
+                <button class="salir" formmethod="dialog" formnovalidate>Cancelar</button>
+                </div>
+            </form>
+</template>
+</body>
+</html>
