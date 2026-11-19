@@ -9,7 +9,7 @@
 <body>
 <aside th:replace="~{menu :: menu(${seccion == 'suministros' ? 'inventario' : seccion})}"></aside>
 <div class="contenido">
-<header class="barra"><span>ControlPOS · Demostración</span>
+<header class="barra"><span>ControlPOS</span>
     <form method="post" th:action="@{/logout}"><button class="salir">Cerrar sesión</button></form>
 </header>
 <main>
@@ -78,6 +78,7 @@
     <section th:if="${seccion == 'gestiones' and puedeSolicitar}" class="panel formulario-gestion">
         <h2><span>Crear gestión</span></h2>
         <form class="gestion-form" method="post" th:action="@{/solicitudes}">
+            <input type="hidden" name="responsable" th:value="${administrador ? '' : responsable}">
             <label>Comercio
                 <select name="comercio" required>
                     <option value="">Selecciona un comercio</option>
@@ -93,7 +94,15 @@
                     <option value="CAMBIO">Cambio de datáfono</option>
                 </select>
             </label>
-            <label>Serie del POS
+            <label data-campo="disponibles" hidden>Series disponibles en inventario
+                <select name="serie" multiple size="5" disabled aria-describedby="ayuda-disponibles">
+                    <option th:each="equipo : ${seriesDisponibles}" th:value="${equipo.terminal.serie}"
+                            th:text="${equipo.terminal.serie + ' · ' + equipo.terminal.marca + ' ' + equipo.terminal.modelo + ' · ' + equipo.ubicacion}"></option>
+                </select>
+                <small id="ayuda-disponibles">Selecciona los equipos que se instalarán o enviarán. Los equipos de una gestión deben salir de la misma bodega.</small>
+                <small th:if="${seriesDisponibles.isEmpty()}">No hay equipos disponibles para esta gestión.</small>
+            </label>
+            <label data-campo="serie">Serie del POS
                 <input name="serie" maxlength="1000" list="series-disponibles" autocomplete="off">
                 <small data-ayuda-serie>Selecciona el tipo de gestión.</small>
             </label>
@@ -101,7 +110,7 @@
                 <input name="reemplazo" maxlength="60" list="series-disponibles" autocomplete="off" disabled>
             </label>
             <datalist id="series-disponibles">
-                <option th:each="pos : ${seriesDisponibles}" th:value="${pos.serie}" th:label="${pos.marca + ' ' + pos.modelo}"></option>
+                <option th:each="pos : ${seriesDisponibles}" th:value="${pos.terminal.serie}" th:label="${pos.terminal.marca + ' ' + pos.terminal.modelo + ' · ' + pos.ubicacion}"></option>
             </datalist>
             <fieldset data-campo="suministros" hidden disabled>
                 <legend>Suministros y accesorios</legend>
@@ -118,6 +127,8 @@
             <h3 th:text="${'#' + s.id + ' · ' + s.datos.tipo + ' · ' + s.estado}"></h3>
             <p th:text="${'Solicitante: ' + s.solicitante + (s.revisor.isEmpty() ? '' : ' · Revisó: ' + s.revisor)}"></p>
             <p th:text="${s.datos.comercio + ' ' + s.datos.serie + ' ' + s.datos.reemplazo + ' ' + s.datos.material + (s.datos.cantidad > 0 ? ' × ' + s.datos.cantidad : '')}"></p>
+            <p th:if="${s.estado == 'Pendiente'}">Pendiente de aprobación. Los cambios de inventario se aplicarán al aprobar esta solicitud.</p>
+            <a class="salir" th:if="${s.estado == 'Aprobada'}" th:href="@{/terminales}">Ver inventario actualizado</a>
             <p th:if="${!s.motivo.isEmpty()}" th:text="${s.motivo}"></p>
             <ul th:unless="${s.movimientos.isEmpty()}">
                 <li th:each="m : ${s.movimientos}" th:text="${m.categoria + ' · ' + m.articulo + ' · ' + m.detalle + ' · ' + m.bodega + ' · ' + m.cantidad}"></li>

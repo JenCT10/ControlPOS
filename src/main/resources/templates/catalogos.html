@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catálogos | ControlPOS</title><link rel="stylesheet" th:href="@{/css/inventario.css}">
+</head><body>
+<aside th:replace="~{menu :: menu(${seccion == 'suministros' ? 'inventario' : seccion})}"></aside>
+<div class="contenido">
+<header class="barra"><span>ControlPOS</span><form method="post" th:action="@{/logout}"><button class="salir">Cerrar sesión</button></form></header>
+<main>
+<div class="encabezado">
+<h1 th:text="${seccion == 'comercios' ? 'Comercios' : (seccion == 'suministros' ? 'Bodegas' : 'Aprobaciones')}"></h1>
+<a class="salir" th:href="@{/terminales}">Volver al inventario</a>
+</div>
+<p th:if="${aviso}" role="status" th:text="${aviso}"></p><p th:if="${error}" role="alert" th:text="${error}"></p>
+<section class="panel" th:if="${seccion == 'comercios' and puedeCargar}">
+<h2>Agregar comercio</h2>
+<form class="filtros" method="post" th:action="@{/solicitudes}">
+<input type="hidden" name="tipo" value="ALTA_COMERCIO">
+<label>Código<input name="comercio" maxlength="30" required></label><label>Nombre<input name="modelo" maxlength="100" required></label>
+<button class="filtrar">Agregar comercio</button>
+</form></section>
+<section class="panel panel-separado" th:if="${seccion == 'comercios'}">
+<h2>Comercios registrados</h2><div class="tabla"><table>
+<thead><tr><th>Código</th><th>Nombre</th><th>Estado</th></tr></thead>
+<tbody><tr th:each="c : ${comercios}"><td th:text="${c.key}"></td><td th:text="${c.value}"></td><td th:text="${c.estado}"></td></tr>
+<tr th:if="${comercios.isEmpty()}"><td colspan="3">Todavía no hay comercios registrados.</td></tr></tbody>
+</table></div></section>
+<section class="panel" th:if="${seccion == 'suministros'}">
+<h2>Bodegas disponibles</h2><div class="tabla"><table>
+<thead><tr><th>Bodega</th><th>Responsable</th><th>Acciones</th></tr></thead>
+<tbody><tr th:each="b : ${bodegas}"><td th:text="${b.nombre}"></td><td th:text="${b.responsable}"></td>
+<td><a class="salir" th:href="@{/suministros(bodega=${b.nombre})}">Ver bodega</a></td></tr></tbody></table></div>
+<form class="filtros" method="post" th:action="@{/bodegas}" th:if="${administrador}">
+<label>Nombre de bodega<input name="nombre" maxlength="100" required></label>
+<label>Responsable<select name="responsable"><option value="">Sin asignar</option>
+<option th:each="u : ${usuarios}" th:value="${u.id}" th:text="${u.nombre + ' · ' + u.login}"></option></select></label>
+<button class="filtrar">Crear bodega</button></form></section>
+<section class="panel panel-separado" th:if="${seccion == 'suministros' and !bodega.isEmpty()}">
+<h2 th:text="${bodega}"></h2><div class="contenido-modulo"><a class="salir" th:href="@{/terminales(bodega=${bodega})}">Ver equipos POS</a></div>
+<div class="tabla"><table><thead><tr><th>Material</th><th>Unidades</th></tr></thead>
+<tbody><tr th:each="m : ${materiales}"><td th:text="${m.key}"></td><td th:text="${m.value}"></td></tr>
+<tr th:if="${materiales.isEmpty()}"><td colspan="2">Sin materiales registrados.</td></tr></tbody></table></div></section>
+<section class="panel" th:if="${seccion == 'aprobaciones'}">
+<h2>Solicitudes pendientes</h2><article class="contenido-modulo" th:each="p : ${pendientes}">
+<h3 th:text="${'#' + p.id + ' · ' + p.tipo}"></h3><p th:text="${p.solicitante + ' · ' + p.detalle}"></p>
+<form class="filtros" method="post" th:action="@{/aprobaciones/{id}(id=${p.id})}">
+<label>Motivo de rechazo<input name="motivo" maxlength="500"></label>
+<button class="filtrar" name="aprobar" value="true">Aprobar</button><button class="salir" name="aprobar" value="false">Rechazar</button>
+</form></article><h2>Comercios pendientes</h2>
+<article class="contenido-modulo" th:each="c : ${comercios}" th:if="${c.estado == 'Pendiente'}">
+<p th:text="${c.key + ' · ' + c.value}"></p>
+<form method="post" th:action="@{/aprobaciones/comercio/{codigo}(codigo=${c.key})}"><button class="filtrar">Aprobar comercio</button></form>
+</article></section>
+</main></div></body></html>

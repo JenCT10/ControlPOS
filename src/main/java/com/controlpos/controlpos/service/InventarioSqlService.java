@@ -21,7 +21,7 @@ public class InventarioSqlService implements InventarioService {
     @Override
     @Transactional(readOnly = true)
     public List<Terminal> consultar(String serie, EstadoTerminal estado, String comercio) {
-        return repositorio.buscar(serie.strip(), estado == null ? "" : estado.name(), comercio.strip());
+        return repositorio.buscar(serie.strip(), estado == null ? "" : (estado == EstadoTerminal.ASIGNADO ? "INSTALADO" : estado.name()), comercio.strip());
     }
 }
 

@@ -2,7 +2,7 @@ package com.controlpos.controlpos.model;
 
 public enum EstadoTerminal {
     DISPONIBLE("Disponible"),
-    ASIGNADO("Asignado"),
+    ASIGNADO("Instalado"),
     MANTENIMIENTO("En mantenimiento"),
     INACTIVO("Inactivo"), EN_TRANSITO("En tránsito"), PENDIENTE_REVISION("Pendiente de revisión");
 

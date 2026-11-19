@@ -13,7 +13,7 @@ public class Terminal {
     private String marca;
     private String modelo;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = EstadoTerminalConverter.class)
     private EstadoTerminal estado;
 
     protected Terminal() {

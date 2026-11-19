@@ -14,9 +14,8 @@ public interface TerminalRepository extends JpaRepository<Terminal, Long> {
             WHERE (:serie = '' OR CHARINDEX(:serie, t.serie) > 0)
               AND (:estado = '' OR t.estado = :estado)
               AND (:comercio = '' OR EXISTS (
-                  SELECT 1 FROM dbo.asignacion a
-                  JOIN dbo.comercio c ON c.id = a.comercio_id
-                  WHERE a.terminal_id = t.id AND a.devolucion IS NULL
+                  SELECT 1 FROM dbo.comercio c
+                  WHERE c.id = t.comercio_id
                     AND (CHARINDEX(:comercio, c.nombre) > 0
                       OR CHARINDEX(:comercio, c.codigo) > 0)
               ))

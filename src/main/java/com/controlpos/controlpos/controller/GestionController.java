@@ -24,16 +24,24 @@ public class GestionController {
     }
 
     @GetMapping("/gestiones")
-    public String ver(Authentication usuario, Model modelo) {
+    public String ver(Authentication usuario, Model modelo,
+                      @RequestParam(defaultValue = "") String responsable) {
+        String asignado = operaciones.identidad(usuario.getName());
+        if (tieneRol(usuario, "ADMINISTRADOR") && operaciones.bodegas().containsKey(responsable)) {
+            asignado = responsable;
+        }
+        final String bodegaAsignada = asignado;
+        modelo.addAttribute("bodegas", operaciones.bodegas());
+        modelo.addAttribute("responsable", asignado);
         modelo.addAttribute("seccion", "gestiones");
         modelo.addAttribute("comercios", operaciones.comercios());
         modelo.addAttribute("solicitudes", operaciones.solicitudes());
         modelo.addAttribute("puedeSolicitar", tieneRol(usuario, "SOPORTISTA") || tieneRol(usuario, "ADMINISTRADOR"));
         modelo.addAttribute("usuarioActual", operaciones.identidad(usuario.getName()));
         modelo.addAttribute("seriesDisponibles", operaciones.equipos().stream()
-            .filter(e -> e.ubicacion().equals(operaciones.identidad(usuario.getName())))
+            .filter(e -> tieneRol(usuario, "ADMINISTRADOR") || e.ubicacion().equals(bodegaAsignada))
             .filter(e -> e.terminal().getEstado() == EstadoTerminal.DISPONIBLE)
-            .map(com.controlpos.controlpos.model.Equipo::terminal).toList());
+            .toList());
         return "operaciones";
     }
     @PostMapping("/solicitudes")
@@ -41,9 +49,30 @@ public class GestionController {
                             @RequestParam(defaultValue = "") String serie, @RequestParam(defaultValue = "") String reemplazo,
                             @RequestParam(defaultValue = "") String marca, @RequestParam(defaultValue = "") String modelo,
                             @RequestParam(defaultValue = "") String material, @RequestParam(defaultValue = "0") int cantidad,
+                            @RequestParam(defaultValue = "") String responsable,
                             @RequestParam(required = false) Long origen, @RequestParam(required = false) List<Integer> articulos,
                             Authentication usuario, RedirectAttributes mensaje) {
         try {
+            String asignado = operaciones.identidad(usuario.getName());
+            boolean gestion = tipo == Tipo.INSTALACION || tipo == Tipo.ENCOMIENDA || tipo == Tipo.RETIRO || tipo == Tipo.CAMBIO;
+            if (gestion && tieneRol(usuario, "ADMINISTRADOR") && responsable.isBlank()) {
+                String seleccion = tipo == Tipo.CAMBIO ? reemplazo : serie;
+                String primeraSerie = codigo(seleccion.split(",", -1)[0]);
+                asignado = operaciones.equipos().stream()
+                    .filter(e -> e.terminal().getSerie().equals(primeraSerie))
+                    .filter(e -> e.terminal().getEstado() == EstadoTerminal.DISPONIBLE)
+                    .map(com.controlpos.controlpos.model.Equipo::ubicacion)
+                    .findFirst().orElse("bodega.central");
+            }
+            if (gestion && !responsable.isBlank()) {
+                if (!tieneRol(usuario, "ADMINISTRADOR") && !responsable.equals(asignado)) {
+                    throw new IllegalArgumentException("Solo puedes registrar gestiones de tu bodega.");
+                }
+                if (!operaciones.bodegas().containsKey(responsable)) {
+                    throw new IllegalArgumentException("Selecciona la bodega del soportista asignado.");
+                }
+                asignado = responsable;
+            }
             if (serie.length() > 1000 || reemplazo.length() > 60 || marca.length() > 60 || modelo.length() > 100
                     || comercio.length() > 30 || material.length() > 80) {
                 throw new IllegalArgumentException("Revisa la longitud de los campos.");
@@ -60,11 +89,14 @@ public class GestionController {
             operaciones.solicitar(new Datos(tipo, traslado || ingreso ? comercio.strip() : codigo(comercio), codigo(serie),
                 traslado ? reemplazo.strip() : codigo(reemplazo),
                 marca.strip(), modelo.strip(), material.strip(), cantidad, origen,
-                articulos == null ? List.of() : List.copyOf(articulos)), operaciones.identidad(usuario.getName()), tieneRol(usuario, "ADMINISTRADOR"));
-            mensaje.addFlashAttribute("aviso", "Solicitud registrada. Consulta su estado en Gestiones.");
+                articulos == null ? List.of() : List.copyOf(articulos)), asignado, tieneRol(usuario, "ADMINISTRADOR"));
+            mensaje.addFlashAttribute("aviso", tieneRol(usuario, "ADMINISTRADOR") && tipo != Tipo.ANULACION
+                ? "Operación aplicada. El inventario y el historial se actualizaron."
+                : "Solicitud pendiente de aprobación. El supervisor debe aprobarla para actualizar el inventario.");
         } catch (IllegalArgumentException error) {
             mensaje.addFlashAttribute("error", error.getMessage());
         }
+        if (!responsable.isBlank()) mensaje.addAttribute("responsable", responsable);
         return switch (tipo) {
             case INGRESO_POS, INGRESO_SUMINISTRO -> "redirect:/terminales";
             case TRASLADO_POS, TRASLADO_MATERIAL -> "redirect:/suministros";

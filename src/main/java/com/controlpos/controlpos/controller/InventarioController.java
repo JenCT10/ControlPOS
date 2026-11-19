@@ -14,12 +14,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 @Controller
 public class InventarioController {
     private final InventarioService servicio;
+    private final org.springframework.beans.factory.ObjectProvider<com.controlpos.controlpos.service.CatalogoSqlService> catalogos;
 
     private final org.springframework.beans.factory.ObjectProvider<com.controlpos.controlpos.service.GestionService> operaciones;
     
     public InventarioController(InventarioService servicio,
+        org.springframework.beans.factory.ObjectProvider<com.controlpos.controlpos.service.CatalogoSqlService> catalogos,
         org.springframework.beans.factory.ObjectProvider<com.controlpos.controlpos.service.GestionService> operaciones) {
         this.servicio = servicio;
+        this.catalogos = catalogos;
         this.operaciones = operaciones;
     }
 
@@ -42,8 +45,23 @@ public class InventarioController {
             }
             modelo.addAttribute("porBodega", porBodega);
         }
+        var sql = catalogos.getIfAvailable();
+        modelo.addAttribute("inventarioEditable", demo != null || sql != null);
+        if (sql != null) {
+            modelo.addAttribute("bodegas", sql.bodegas().stream().map(com.controlpos.controlpos.service.CatalogoSqlService.Bodega::nombre).toList());
+            var cuenta = usuario.getName();
+            modelo.addAttribute("bodegasPropias", sql.bodegas().stream().filter(b -> b.responsable().equals(cuenta))
+                .map(com.controlpos.controlpos.service.CatalogoSqlService.Bodega::nombre).toList());
+            modelo.addAttribute("usuarioActual", cuenta);
+            ubicaciones.putAll(sql.ubicaciones());
+            var porBodega = new java.util.LinkedHashMap<String, Long>();
+            for (var almacen : sql.bodegas()) {
+                porBodega.put(almacen.nombre(), ubicaciones.values().stream().filter(almacen.nombre()::equals).count());
+            }
+            modelo.addAttribute("porBodega", porBodega);
+        }
         var terminales = servicio.consultar(serie, estado, comercio);
-        if (demo != null && !bodega.isBlank()) {
+        if ((demo != null || sql != null) && !bodega.isBlank()) {
             terminales = terminales.stream().filter(t -> bodega.equals(ubicaciones.get(t.getSerie()))).toList();
         }
         modelo.addAttribute("ubicaciones", ubicaciones);

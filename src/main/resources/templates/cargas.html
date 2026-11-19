@@ -27,7 +27,7 @@
                 <input type="hidden" name="tipo" value="INGRESO_SUMINISTRO">
                 <label th:replace="~{cargas :: selectorBodega}"></label>
                 <label>Material <input name="material" list="materiales-carga" maxlength="80" required></label>
-                <datalist id="materiales-carga"><option value="Tramo de cable"><option value="RJ45"><option value="DB9 hembra"><option value="Cobertor"><option value="Cable Manhattan"></datalist>
+                <datalist id="materiales-carga"><option value="Tramo de cable"><option th:value="${demo ? 'RJ45' : 'Conector RJ45'}"><option th:value="${demo ? 'DB9 hembra' : 'Conector DB9 hembra'}"><option value="Cobertor"><option value="Cable Manhattan"></datalist>
                 <label>Unidades <input name="cantidad" type="number" min="1" max="100000" required></label>
             </div>
             <footer class="ventana-pie"><button class="salir" formmethod="dialog" formnovalidate>Cancelar</button><button class="filtrar">Registrar carga</button></footer>
@@ -37,6 +37,6 @@
 <label xmlns:th="http://www.thymeleaf.org" th:fragment="selectorBodega">Bodega
     <select name="comercio" required>
         <option value="">Selecciona una bodega</option>
-        <option th:each="nombre : ${bodegas}" th:if="${administrador or nombre == usuarioActual}" th:value="${nombre}" th:text="${nombre}"></option>
+        <option th:each="nombre : ${bodegas}" th:if="${administrador or nombre == usuarioActual or (bodegasPropias != null and #lists.contains(bodegasPropias, nombre))}" th:value="${nombre}" th:text="${nombre}"></option>
     </select>
 </label>

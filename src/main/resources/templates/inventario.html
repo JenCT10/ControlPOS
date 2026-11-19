@@ -18,7 +18,7 @@
     <main>
         <div class="encabezado">
             <div><h1>Inventario de datáfonos</h1><p class="descripcion">Consulta los equipos y su estado de operación.</p></div>
-            <button class="filtrar" th:if="${demo and puedeCargar}" type="button" data-dialogo="cargar">＋ Cargar inventario</button>
+            <button class="filtrar" th:if="${inventarioEditable and puedeCargar}" type="button" data-dialogo="cargar">＋ Cargar inventario</button>
         </div>
         <p th:if="${aviso}" role="status" th:text="${aviso}"></p>
         <p th:if="${error}" role="alert" th:text="${error}"></p>
@@ -35,14 +35,14 @@
                 </div>
             </dl>
         </section>
-        <dl class="resumen" th:if="${demo}">
+        <dl class="resumen" th:if="${inventarioEditable}">
             <div class="tarjeta" th:each="entrada : ${porBodega}">
                 <dt><span class="icono-resumen" aria-hidden="true">▤</span><a th:href="@{/suministros(bodega=${entrada.key})}" th:text="${entrada.key}"></a></dt>
                 <dd th:text="${entrada.value}"></dd>
             </div>
         </dl>
         <section class="panel" aria-labelledby="equipos">
-<nav class="pestanas" aria-label="Inventario"><a id="equipos" th:href="@{/terminales}" aria-current="page">Equipos</a><a th:if="${demo}" th:href="@{/suministros}">Bodegas</a><a th:href="@{/historial}">Historial de movimientos</a></nav>
+<nav class="pestanas" aria-label="Inventario"><a id="equipos" th:href="@{/terminales}" aria-current="page">Equipos</a><a th:if="${inventarioEditable}" th:href="@{/suministros}">Bodegas</a><a th:href="@{/historial}">Historial de movimientos</a></nav>
             <form class="filtros" method="get" th:action="@{/terminales}">
                 <label class="busqueda">Serie
                     <input name="serie" th:value="${serie}" maxlength="60" placeholder="Buscar por serie…">
@@ -57,7 +57,7 @@
                 <label>Comercio asignado
                     <input name="comercio" th:value="${comercio}" maxlength="100" placeholder="Nombre o código">
                 </label>
-                <label th:if="${demo}">Bodega
+                <label th:if="${inventarioEditable}">Bodega
                     <select name="bodega">
                         <option value="">Todas las bodegas</option>
                         <option th:each="nombre : ${bodegas}" th:value="${nombre}" th:text="${nombre}" th:selected="${nombre == bodega}"></option>
@@ -70,17 +70,17 @@
             </form>
             <div class="tabla" tabindex="0" role="region" aria-labelledby="equipos">
                 <table>
-                    <thead><tr><th scope="col">Serie</th><th scope="col">Marca</th><th scope="col">Modelo</th><th scope="col">Estado</th><th scope="col" th:if="${demo}">Bodega o comercio</th></tr></thead>
+                    <thead><tr><th scope="col">Serie</th><th scope="col">Marca</th><th scope="col">Modelo</th><th scope="col">Estado</th><th scope="col" th:if="${inventarioEditable}">Bodega o comercio</th></tr></thead>
                     <tbody>
                         <tr th:each="terminal : ${terminales}">
                             <th scope="row" th:text="${terminal.serie}"></th>
                             <td th:text="${terminal.marca}"></td>
                             <td th:text="${terminal.modelo}"></td>
                             <td><span class="estado" th:classappend="${terminal.estado.name()}" th:text="${terminal.estado.etiqueta}"></span></td>
-                            <td th:if="${demo}" th:text="${ubicaciones.get(terminal.serie)}"></td>
+                            <td th:if="${inventarioEditable}" th:text="${ubicaciones.get(terminal.serie)}"></td>
                         </tr>
                         <tr th:if="${#lists.isEmpty(terminales)}">
-                            <td class="vacio" th:colspan="${demo ? 5 : 4}">No se encontraron equipos con estos filtros.</td>
+                            <td class="vacio" th:colspan="${inventarioEditable ? 5 : 4}">No se encontraron equipos con estos filtros.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -88,7 +88,7 @@
         </section>
     </main>
 </div>
-<th:block th:if="${demo and puedeCargar}" th:insert="~{cargas :: ventanas}"></th:block>
+<th:block th:if="${inventarioEditable and puedeCargar}" th:insert="~{cargas :: ventanas}"></th:block>
 <script defer th:src="@{/js/dialogos.js}"></script>
 </body>
 </html>
