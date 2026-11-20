@@ -1,61 +1,80 @@
 package com.controlpos.controlpos.repository;
 
+import com.controlpos.controlpos.model.Rol;
+import com.controlpos.controlpos.model.Usuario;
 import org.springframework.context.annotation.Profile;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.*;
+import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
-@Repository
 @Profile("sqlserver")
-public class UsuarioRepository {
-    public record Cuenta(long id, String nombre, String login, String claveHash, boolean activo, String rol) {}
+public interface UsuarioRepository extends JpaRepository<Usuario,Long> {
+    record Cuenta(long id, String nombre, String login, String claveHash, boolean activo, String rol) {}
 
-    private final JdbcTemplate jdbc;
+    @EntityGraph(attributePaths="rol")
+    Optional<Usuario> findByLoginIgnoreCase(String login);
 
-    public UsuarioRepository(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    @EntityGraph(attributePaths="rol")
+    List<Usuario> findAllByOrderByNombreAscLoginAsc();
+
+    @Query("select r from Rol r where r.nombre=:nombre")
+    Rol rol(@Param("nombre") String nombre);
+
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Rol r where r.nombre='ADMINISTRADOR'")
+    Rol bloquearRolAdministrador();
+
+    @Transactional(readOnly=true)
+    default Optional<Cuenta> buscarPorLogin(String login) {
+        return findByLoginIgnoreCase(login).map(this::visible);
     }
 
-    public Optional<Cuenta> buscarPorLogin(String login) {
-        return listarConsulta(" WHERE u.login = ?", login).stream().findFirst();
+    @Transactional(readOnly=true)
+    default List<Cuenta> listar() {
+        return findAllByOrderByNombreAscLoginAsc().stream().map(this::visible).toList();
     }
 
-    public List<Cuenta> listar() {
-        return listarConsulta(" ORDER BY u.nombre, u.login");
+    private Cuenta visible(Usuario u) {
+        return new Cuenta(u.getId(),u.getNombre(),u.getLogin(),u.getClaveHash(),u.getActivo(),u.getRol().getNombre());
     }
 
-    private List<Cuenta> listarConsulta(String filtro, Object... parametros) {
-        return jdbc.query("""
-            SELECT u.id, u.nombre, u.login, u.clave_hash, u.activo, r.nombre AS rol
-            FROM dbo.usuario u JOIN dbo.rol r ON r.id = u.rol_id
-            """ + filtro, (fila, numero) -> new Cuenta(fila.getLong("id"), fila.getString("nombre"),
-                fila.getString("login"), fila.getString("clave_hash"), fila.getBoolean("activo"),
-                fila.getString("rol")), parametros);
+    @Transactional
+    default void crear(String nombre,String login,String hash,String nombreRol) {
+        var usuario=new Usuario();
+        usuario.setNombre(nombre);
+        usuario.setLogin(login);
+        usuario.setClaveHash(hash);
+        usuario.setRol(rol(nombreRol));
+        saveAndFlush(usuario);
     }
 
-    public void crear(String nombre, String login, String hash, String rol) {
-        jdbc.update("""
-            INSERT INTO dbo.usuario(nombre,login,clave_hash,rol_id)
-            SELECT ?,?,?,id FROM dbo.rol WHERE nombre = ?
-            """, nombre, login, hash, rol);
+    @Transactional
+    default int actualizar(long id,String nombre,String login,String hash,String nombreRol) {
+        var existente=findById(id);
+        if(existente.isEmpty()) return 0;
+        var usuario=existente.get();
+        usuario.setNombre(nombre);
+        usuario.setLogin(login);
+        usuario.setClaveHash(hash);
+        usuario.setRol(rol(nombreRol));
+        usuario.setActualizadoEn(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
+        saveAndFlush(usuario);
+        return 1;
     }
 
-    public int actualizar(long id, String nombre, String login, String hash, String rol) {
-        return jdbc.update("""
-            UPDATE dbo.usuario SET nombre=?, login=?, clave_hash=?,
-                rol_id=(SELECT id FROM dbo.rol WHERE nombre=?), actualizado_en=SYSUTCDATETIME()
-            WHERE id=?
-            """, nombre, login, hash, rol, id);
+    @Transactional
+    default int eliminar(long id) {
+        if(!existsById(id)) return 0;
+        deleteById(id);
+        flush();
+        return 1;
     }
 
-    public int eliminar(long id) {
-        return jdbc.update("DELETE FROM dbo.usuario WHERE id=?", id);
-    }
-
-    public void crearAdministradorInicial(String login, String nombre, String hash) {
-        jdbc.execute("SELECT id FROM dbo.usuario WITH (TABLOCKX, HOLDLOCK)");
-        Integer total = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.usuario", Integer.class);
-        if (total != null && total == 0) crear(nombre, login, hash, "ADMINISTRADOR");
+    @Transactional
+    default void crearAdministradorInicial(String login,String nombre,String hash) {
+        if(bloquearRolAdministrador()==null) throw new IllegalStateException("Falta el rol ADMINISTRADOR.");
+        if(count()==0) crear(nombre,login,hash,"ADMINISTRADOR");
     }
 }

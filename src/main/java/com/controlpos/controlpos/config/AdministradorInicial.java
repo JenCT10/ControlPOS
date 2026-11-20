@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="controlpos.admin.inicializar", havingValue="true", matchIfMissing=true)
 @Component
 @Profile("sqlserver")
 public class AdministradorInicial implements ApplicationRunner {

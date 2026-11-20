@@ -1,120 +1,248 @@
-﻿-- ControlPOS para Microsoft SQL Server. Ejecutar en una instancia personal.
+-- SQL Server. Ejecutar con una cuenta autorizada para crear bases de datos.
 USE master;
 GO
-IF DB_ID(N'controlpos') IS NULL
-    EXEC(N'CREATE DATABASE [controlpos]');
+IF DB_ID(N'ControlPOS_Proyecto') IS NULL
+    EXEC(N'CREATE DATABASE [ControlPOS_Proyecto]');
 GO
-USE [controlpos];
+USE [ControlPOS_Proyecto];
 GO
-SET ANSI_NULLS ON;
-SET ANSI_PADDING ON;
-SET ANSI_WARNINGS ON;
-SET ARITHABORT ON;
-SET CONCAT_NULL_YIELDS_NULL ON;
-SET QUOTED_IDENTIFIER ON;
-SET NUMERIC_ROUNDABORT OFF;
 SET XACT_ABORT ON;
-
+GO
 BEGIN TRY
-    IF DB_NAME() <> N'controlpos'
-        THROW 50002, N'Seleccione la base controlpos antes de continuar.', 1;
     BEGIN TRANSACTION;
-    IF EXISTS (
-        SELECT 1 FROM sys.tables
-        WHERE schema_id = SCHEMA_ID(N'dbo')
-          AND name IN (N'rol', N'usuario', N'comercio', N'terminal', N'asignacion', N'cambio_estado')
-    )
-        THROW 50001, N'Ya existen tablas de ControlPOS. El script no modifica instalaciones existentes.', 1;
+    IF EXISTS (SELECT 1 FROM sys.tables WHERE schema_id = SCHEMA_ID(N'dbo'))
+        THROW 50001, N'ControlPOS_Proyecto ya contiene tablas. Revise la base seleccionada.', 1;
 
-CREATE TABLE dbo.rol (
-  id SMALLINT PRIMARY KEY,
-  nombre NVARCHAR(30) NOT NULL UNIQUE
-);
+    CREATE TABLE dbo.rol (
+        id SMALLINT NOT NULL PRIMARY KEY,
+        nombre VARCHAR(20) NOT NULL UNIQUE,
+        CONSTRAINT ck_rol_nombre CHECK (nombre IN ('ADMINISTRADOR','SUPERVISOR','SOPORTISTA'))
+    );
 
-CREATE TABLE dbo.usuario (
-  id BIGINT IDENTITY(1,1) PRIMARY KEY,
-  rol_id SMALLINT NOT NULL,
-  nombre NVARCHAR(100) NOT NULL,
-  login NVARCHAR(60) NOT NULL UNIQUE,
-  clave_hash NVARCHAR(255) NOT NULL,
-  activo BIT NOT NULL DEFAULT 1,
-  FOREIGN KEY (rol_id) REFERENCES dbo.rol(id)
-);
+    CREATE TABLE dbo.usuario (
+        id BIGINT IDENTITY PRIMARY KEY,
+        nombre NVARCHAR(120) NOT NULL,
+        login VARCHAR(60) NOT NULL UNIQUE,
+        clave_hash VARCHAR(255) NOT NULL,
+        rol_id SMALLINT NOT NULL REFERENCES dbo.rol(id),
+        activo BIT NOT NULL DEFAULT 1,
+        creado_en DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        actualizado_en DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        version ROWVERSION,
+        CONSTRAINT ck_usuario_nombre CHECK (LEN(TRIM(nombre)) > 0),
+        CONSTRAINT ck_usuario_login CHECK (LEN(TRIM(login)) >= 3)
+    );
 
-CREATE TABLE dbo.comercio (
-  id BIGINT IDENTITY(1,1) PRIMARY KEY,
-  codigo NVARCHAR(30) NOT NULL UNIQUE,
-  nombre NVARCHAR(100) NOT NULL,
-  ubicacion NVARCHAR(180) NOT NULL,
-  activo BIT NOT NULL DEFAULT 1
-);
+    CREATE TABLE dbo.bodega (
+        id BIGINT IDENTITY PRIMARY KEY,
+        nombre NVARCHAR(100) NOT NULL UNIQUE,
+        responsable_id BIGINT NULL REFERENCES dbo.usuario(id),
+        activa BIT NOT NULL DEFAULT 1,
+        CONSTRAINT ck_bodega_nombre CHECK (LEN(TRIM(nombre)) > 0)
+    );
 
-CREATE TABLE dbo.terminal (
-  id BIGINT IDENTITY(1,1) PRIMARY KEY,
-  serie NVARCHAR(60) NOT NULL UNIQUE,
-  marca NVARCHAR(60) NOT NULL,
-  modelo NVARCHAR(60) NOT NULL,
-  estado NVARCHAR(13) NOT NULL CHECK (estado IN ('DISPONIBLE','ASIGNADO','MANTENIMIENTO','INACTIVO')) DEFAULT N'DISPONIBLE'
-);
+    CREATE TABLE dbo.comercio (
+        id BIGINT IDENTITY PRIMARY KEY,
+        codigo VARCHAR(30) NOT NULL UNIQUE,
+        nombre NVARCHAR(100) NOT NULL,
+        ubicacion NVARCHAR(250) NULL,
+        activo BIT NOT NULL DEFAULT 1,
+        creado_por BIGINT NOT NULL REFERENCES dbo.usuario(id),
+        creado_en DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        aprobado_por BIGINT NULL REFERENCES dbo.usuario(id),
+        aprobado_en DATETIME2(3) NULL,
+        CONSTRAINT ck_comercio_nombre CHECK (LEN(TRIM(nombre)) > 0),
+        CONSTRAINT ck_comercio_aprobacion CHECK (
+            (aprobado_por IS NULL AND aprobado_en IS NULL) OR
+            (aprobado_por IS NOT NULL AND aprobado_en IS NOT NULL))
+    );
 
-CREATE TABLE dbo.asignacion (
-  id BIGINT IDENTITY(1,1) PRIMARY KEY,
-  terminal_id BIGINT NOT NULL,
-  comercio_id BIGINT NOT NULL,
-  entrega_por BIGINT NOT NULL,
-  entrega DATETIME2(0) NOT NULL,
-  devolucion_por BIGINT,
-  devolucion DATETIME2(0),
-  FOREIGN KEY (terminal_id) REFERENCES dbo.terminal(id),
-  FOREIGN KEY (comercio_id) REFERENCES dbo.comercio(id),
-  FOREIGN KEY (entrega_por) REFERENCES dbo.usuario(id),
-  FOREIGN KEY (devolucion_por) REFERENCES dbo.usuario(id),
-  CHECK ((devolucion IS NULL AND devolucion_por IS NULL)
-      OR (devolucion IS NOT NULL AND devolucion_por IS NOT NULL AND devolucion >= entrega))
-);
+    CREATE TABLE dbo.material (
+        id BIGINT IDENTITY PRIMARY KEY,
+        nombre NVARCHAR(100) NOT NULL UNIQUE,
+        activo BIT NOT NULL DEFAULT 1,
+        CONSTRAINT ck_material_nombre CHECK (LEN(TRIM(nombre)) > 0)
+    );
 
-CREATE TABLE dbo.cambio_estado (
-  id BIGINT IDENTITY(1,1) PRIMARY KEY,
-  terminal_id BIGINT NOT NULL,
-  usuario_id BIGINT NOT NULL,
-  fecha DATETIME2(0) NOT NULL,
-  anterior NVARCHAR(13) NOT NULL CHECK (anterior IN ('DISPONIBLE','ASIGNADO','MANTENIMIENTO','INACTIVO')),
-  nuevo NVARCHAR(13) NOT NULL CHECK (nuevo IN ('DISPONIBLE','ASIGNADO','MANTENIMIENTO','INACTIVO')),
-  FOREIGN KEY (terminal_id) REFERENCES dbo.terminal(id),
-  FOREIGN KEY (usuario_id) REFERENCES dbo.usuario(id),
-  CHECK (anterior <> nuevo)
-);
+    CREATE TABLE dbo.componente_material (
+        material_id BIGINT NOT NULL REFERENCES dbo.material(id),
+        componente_id BIGINT NOT NULL REFERENCES dbo.material(id),
+        cantidad INT NOT NULL,
+        PRIMARY KEY (material_id, componente_id),
+        CONSTRAINT ck_componente_distinto CHECK (material_id <> componente_id),
+        CONSTRAINT ck_componente_cantidad CHECK (cantidad > 0)
+    );
 
-CREATE INDEX idx_terminal_estado ON dbo.terminal(estado);
-CREATE INDEX idx_asignacion_comercio ON dbo.asignacion(comercio_id, devolucion);
-CREATE UNIQUE INDEX ux_asignacion_activa
-  ON dbo.asignacion(terminal_id) WHERE devolucion IS NULL;
-INSERT INTO dbo.rol VALUES (1,'ADMINISTRADOR'),(2,'INVENTARIO');
--- Cuentas de evidencia desactivadas. El marcador no es una contraseña ni un hash utilizable.
-SET IDENTITY_INSERT dbo.usuario ON;
-INSERT INTO dbo.usuario VALUES (1,1,'Administracion demo','admin.demo','CUENTA_INACTIVA',0),
-(2,2,'Inventario demo','inventario.demo','CUENTA_INACTIVA',0);
-SET IDENTITY_INSERT dbo.usuario OFF;
-SET IDENTITY_INSERT dbo.comercio ON;
-INSERT INTO dbo.comercio VALUES (1,'COM-001','Comercio Central','Perez Zeledon',1),
-(2,'COM-002','Comercio Sur','Buenos Aires',1);
-SET IDENTITY_INSERT dbo.comercio OFF;
-SET IDENTITY_INSERT dbo.terminal ON;
-INSERT INTO dbo.terminal VALUES (1,'POS-001','PAX','A920','DISPONIBLE'),
-(2,'POS-002','Ingenico','DX8000','ASIGNADO'),
-(3,'POS-003','PAX','A920','MANTENIMIENTO'),
-(4,'POS-004','Ingenico','DX8000','INACTIVO');
-SET IDENTITY_INSERT dbo.terminal OFF;
-INSERT INTO dbo.asignacion (terminal_id,comercio_id,entrega_por,entrega,devolucion_por,devolucion)
-VALUES (1,2,2,'2026-10-01T09:00:00',2,'2026-10-03T10:00:00'),(2,1,2,'2026-10-04T08:00:00',NULL,NULL);
-INSERT INTO dbo.cambio_estado (terminal_id,usuario_id,fecha,anterior,nuevo)
-VALUES (3,2,'2026-10-05T09:00:00','DISPONIBLE','MANTENIMIENTO');
-COMMIT TRANSACTION;
-SELECT serie, estado FROM dbo.terminal ORDER BY serie;
+    CREATE TABLE dbo.existencias_material (
+        bodega_id BIGINT NOT NULL REFERENCES dbo.bodega(id),
+        material_id BIGINT NOT NULL REFERENCES dbo.material(id),
+        cantidad INT NOT NULL DEFAULT 0,
+        version ROWVERSION,
+        PRIMARY KEY (bodega_id, material_id),
+        CONSTRAINT ck_existencias_no_negativas CHECK (cantidad >= 0)
+    );
 
+    CREATE TABLE dbo.terminal (
+        id BIGINT IDENTITY PRIMARY KEY,
+        serie VARCHAR(60) NOT NULL UNIQUE,
+        codigo_interno BIT NOT NULL DEFAULT 0,
+        marca NVARCHAR(60) NOT NULL,
+        modelo NVARCHAR(60) NOT NULL,
+        consecutivo_bncr NVARCHAR(60) NULL,
+        fecha_ingreso DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        estado VARCHAR(30) NOT NULL DEFAULT 'DISPONIBLE',
+        bodega_id BIGINT NULL REFERENCES dbo.bodega(id),
+        comercio_id BIGINT NULL REFERENCES dbo.comercio(id),
+        version ROWVERSION,
+        CONSTRAINT ck_terminal_estado CHECK (estado IN
+            ('DISPONIBLE','INSTALADO','EN_TRANSITO','PENDIENTE_REVISION',
+             'MANTENIMIENTO','INACTIVO','ENVIADO_BNCR')),
+        CONSTRAINT ck_terminal_ubicacion CHECK (
+            (estado IN ('DISPONIBLE','PENDIENTE_REVISION','MANTENIMIENTO','INACTIVO')
+                AND bodega_id IS NOT NULL AND comercio_id IS NULL)
+            OR (estado IN ('INSTALADO','EN_TRANSITO')
+                AND bodega_id IS NULL AND comercio_id IS NOT NULL)
+            OR (estado = 'ENVIADO_BNCR' AND bodega_id IS NULL AND comercio_id IS NULL)),
+        CONSTRAINT ck_terminal_serie CHECK (LEN(TRIM(serie)) > 0)
+    );
+
+    CREATE TABLE dbo.gestion (
+        id BIGINT IDENTITY PRIMARY KEY,
+        tipo VARCHAR(30) NOT NULL,
+        estado VARCHAR(20) NOT NULL DEFAULT 'PENDIENTE',
+        comercio_id BIGINT NULL REFERENCES dbo.comercio(id),
+        bodega_origen_id BIGINT NULL REFERENCES dbo.bodega(id),
+        bodega_destino_id BIGINT NULL REFERENCES dbo.bodega(id),
+        solicitante_id BIGINT NOT NULL REFERENCES dbo.usuario(id),
+        asignado_id BIGINT NULL REFERENCES dbo.usuario(id),
+        revisor_id BIGINT NULL REFERENCES dbo.usuario(id),
+        gestion_original_id BIGINT NULL REFERENCES dbo.gestion(id),
+        asunto NVARCHAR(250) NULL,
+        descripcion NVARCHAR(2000) NULL,
+        motivo_revision NVARCHAR(500) NULL,
+        contacto_nombre NVARCHAR(120) NULL,
+        contacto_telefono NVARCHAR(30) NULL,
+        contacto_email NVARCHAR(254) NULL,
+        creada_en DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        revisada_en DATETIME2(3) NULL,
+        aplicada_en DATETIME2(3) NULL,
+        clave_operacion UNIQUEIDENTIFIER NOT NULL UNIQUE,
+        version ROWVERSION,
+        CONSTRAINT ck_gestion_tipo CHECK (tipo IN ('INSTALACION','ENCOMIENDA','RETIRO','CAMBIO',
+            'INGRESO_POS','INGRESO_SUMINISTRO','TRASLADO_POS','TRASLADO_MATERIAL',
+            'ANULACION','AJUSTE_MATERIAL','ENVIO_BNCR')),
+        CONSTRAINT ck_gestion_estado CHECK (estado IN ('PENDIENTE','APROBADA','RECHAZADA')),
+        CONSTRAINT ck_gestion_comercio CHECK (
+            tipo NOT IN ('INSTALACION','ENCOMIENDA','RETIRO','CAMBIO') OR comercio_id IS NOT NULL),
+        CONSTRAINT ck_gestion_anulacion CHECK (
+            (tipo = 'ANULACION' AND gestion_original_id IS NOT NULL) OR
+            (tipo <> 'ANULACION' AND gestion_original_id IS NULL)),
+        CONSTRAINT ck_gestion_revision CHECK (
+            (estado = 'PENDIENTE' AND revisor_id IS NULL AND revisada_en IS NULL AND aplicada_en IS NULL)
+            OR (estado = 'APROBADA' AND revisor_id IS NOT NULL AND revisada_en IS NOT NULL AND aplicada_en IS NOT NULL)
+            OR (estado = 'RECHAZADA' AND revisor_id IS NOT NULL AND revisada_en IS NOT NULL
+                AND aplicada_en IS NULL AND LEN(TRIM(motivo_revision)) > 0)),
+        CONSTRAINT ck_gestion_traslado CHECK (
+            tipo NOT IN ('TRASLADO_POS','TRASLADO_MATERIAL') OR
+            (bodega_origen_id IS NOT NULL AND bodega_destino_id IS NOT NULL AND bodega_origen_id <> bodega_destino_id))
+    );
+
+    CREATE TABLE dbo.gestion_pos (
+        id BIGINT IDENTITY PRIMARY KEY,
+        gestion_id BIGINT NOT NULL REFERENCES dbo.gestion(id),
+        terminal_id BIGINT NULL REFERENCES dbo.terminal(id),
+        serie_declarada VARCHAR(60) NULL,
+        marca_declarada NVARCHAR(60) NULL,
+        modelo_declarado NVARCHAR(60) NULL,
+        accion VARCHAR(15) NOT NULL,
+        CONSTRAINT ck_gestion_pos_accion CHECK (accion IN ('ENTRADA','SALIDA','RETIRO','REEMPLAZO','TRASLADO')),
+        CONSTRAINT uq_gestion_pos UNIQUE (gestion_id, terminal_id, accion)
+    );
+
+    CREATE TABLE dbo.gestion_material (
+        id BIGINT IDENTITY PRIMARY KEY,
+        gestion_id BIGINT NOT NULL REFERENCES dbo.gestion(id),
+        material_id BIGINT NOT NULL REFERENCES dbo.material(id),
+        cantidad INT NOT NULL,
+        CONSTRAINT ck_gestion_material_cantidad CHECK (cantidad > 0),
+        CONSTRAINT uq_gestion_material UNIQUE (gestion_id, material_id)
+    );
+
+    CREATE TABLE dbo.movimiento_pos (
+        id BIGINT IDENTITY PRIMARY KEY,
+        gestion_id BIGINT NOT NULL REFERENCES dbo.gestion(id),
+        terminal_id BIGINT NOT NULL REFERENCES dbo.terminal(id),
+        usuario_id BIGINT NOT NULL REFERENCES dbo.usuario(id),
+        tipo VARCHAR(30) NOT NULL,
+        estado_anterior VARCHAR(30) NULL,
+        estado_nuevo VARCHAR(30) NOT NULL,
+        bodega_origen_id BIGINT NULL REFERENCES dbo.bodega(id),
+        bodega_destino_id BIGINT NULL REFERENCES dbo.bodega(id),
+        comercio_origen_id BIGINT NULL REFERENCES dbo.comercio(id),
+        comercio_destino_id BIGINT NULL REFERENCES dbo.comercio(id),
+        movimiento_revertido_id BIGINT NULL REFERENCES dbo.movimiento_pos(id),
+        fecha DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        detalle NVARCHAR(500) NULL,
+        CONSTRAINT uq_movimiento_pos UNIQUE (gestion_id, terminal_id),
+        CONSTRAINT ck_movimiento_estado CHECK (estado_nuevo IN
+            ('DISPONIBLE','INSTALADO','EN_TRANSITO','PENDIENTE_REVISION','MANTENIMIENTO','INACTIVO','ENVIADO_BNCR'))
+    );
+
+    CREATE UNIQUE INDEX ux_reversion_pos ON dbo.movimiento_pos(movimiento_revertido_id)
+        WHERE movimiento_revertido_id IS NOT NULL;
+
+    CREATE TABLE dbo.movimiento_material (
+        id BIGINT IDENTITY PRIMARY KEY,
+        gestion_id BIGINT NOT NULL REFERENCES dbo.gestion(id),
+        material_id BIGINT NOT NULL REFERENCES dbo.material(id),
+        bodega_id BIGINT NOT NULL REFERENCES dbo.bodega(id),
+        usuario_id BIGINT NOT NULL REFERENCES dbo.usuario(id),
+        tipo VARCHAR(40) NOT NULL,
+        cantidad INT NOT NULL,
+        saldo_resultante INT NOT NULL,
+        movimiento_revertido_id BIGINT NULL REFERENCES dbo.movimiento_material(id),
+        fecha DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+        detalle NVARCHAR(500) NULL,
+        CONSTRAINT ck_movimiento_cantidad CHECK (cantidad <> 0),
+        CONSTRAINT ck_movimiento_saldo CHECK (saldo_resultante >= 0),
+        CONSTRAINT uq_movimiento_material UNIQUE (gestion_id, material_id, bodega_id)
+    );
+
+    CREATE UNIQUE INDEX ux_reversion_material ON dbo.movimiento_material(movimiento_revertido_id)
+        WHERE movimiento_revertido_id IS NOT NULL;
+
+    CREATE TABLE dbo.anulacion_pos (
+        gestion_id BIGINT NOT NULL REFERENCES dbo.gestion(id),
+        movimiento_id BIGINT NOT NULL REFERENCES dbo.movimiento_pos(id),
+        PRIMARY KEY (gestion_id, movimiento_id)
+    );
+
+    CREATE TABLE dbo.anulacion_material (
+        gestion_id BIGINT NOT NULL REFERENCES dbo.gestion(id),
+        movimiento_id BIGINT NOT NULL REFERENCES dbo.movimiento_material(id),
+        PRIMARY KEY (gestion_id, movimiento_id)
+    );
+
+    CREATE INDEX ix_terminal_filtros ON dbo.terminal(estado, bodega_id, comercio_id);
+    CREATE INDEX ix_gestion_pendientes ON dbo.gestion(estado, creada_en);
+    CREATE INDEX ix_movimiento_pos_fecha ON dbo.movimiento_pos(fecha, terminal_id);
+    CREATE INDEX ix_movimiento_material_fecha ON dbo.movimiento_material(fecha, bodega_id, material_id);
+
+    INSERT INTO dbo.rol(id,nombre) VALUES (1,'ADMINISTRADOR'),(2,'SUPERVISOR'),(3,'SOPORTISTA');
+    INSERT INTO dbo.bodega(nombre) VALUES (N'Bodega central');
+    INSERT INTO dbo.material(nombre) VALUES
+        (N'Tramo de cable'),(N'Conector RJ45'),(N'Conector DB9 hembra'),
+        (N'Cobertor'),(N'Cable de datos'),(N'Fuente de poder'),(N'Base para datáfono'),(N'Cable Manhattan');
+    INSERT INTO dbo.componente_material(material_id,componente_id,cantidad)
+        SELECT padre.id,hijo.id,1 FROM dbo.material padre CROSS JOIN dbo.material hijo
+        WHERE padre.nombre = N'Cable de datos'
+        AND hijo.nombre IN (N'Tramo de cable',N'Conector RJ45',N'Conector DB9 hembra',N'Cobertor');
+
+    COMMIT TRANSACTION;
+    SELECT name AS tabla FROM sys.tables WHERE schema_id = SCHEMA_ID(N'dbo') ORDER BY name;
 END TRY
 BEGIN CATCH
     IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
     THROW;
 END CATCH;
-
+GO

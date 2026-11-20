@@ -1,7 +1,9 @@
 package com.controlpos.controlpos.controller;
 
 import org.springframework.context.annotation.Profile;
-import org.springframework.jdbc.core.JdbcTemplate;
+import com.controlpos.controlpos.repository.MovimientoPosRepository;
+import com.controlpos.controlpos.repository.MovimientoMaterialRepository;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -16,36 +18,35 @@ import java.util.TreeSet;
 public class HistorialSqlController {
     public record Fila(long gestion,String fecha,String hora,String articulo,String detalle,String bodega,
                        int cantidad,String responsable,LocalDate dia) {}
-    private final JdbcTemplate jdbc;
+    private final MovimientoPosRepository pos;
+    private final MovimientoMaterialRepository materialesRepository;
 
-    public HistorialSqlController(JdbcTemplate jdbc) { this.jdbc=jdbc; }
-
+    public HistorialSqlController(MovimientoPosRepository pos,MovimientoMaterialRepository materialesRepository) {
+        this.pos=pos;
+        this.materialesRepository=materialesRepository;
+    }
     @GetMapping("/movimientos")
     public String movimientos() { return "redirect:/historial"; }
 
+    @Transactional(readOnly=true)
     @GetMapping("/historial")
     public String ver(@RequestParam(defaultValue="pos") String categoria,@RequestParam(defaultValue="") String buscar,
                       @RequestParam(defaultValue="") String bodega,@RequestParam(defaultValue="") String tipo,
                       @RequestParam(required=false) LocalDate fecha,Model modelo) {
         boolean materiales="materiales".equals(categoria);
-        String consulta=materiales?"""
-            SELECT m.gestion_id,m.fecha,a.nombre articulo,m.tipo,COALESCE(b.nombre,'') bodega,m.cantidad,u.login
-            FROM dbo.movimiento_material m JOIN dbo.material a ON a.id=m.material_id
-            JOIN dbo.bodega b ON b.id=m.bodega_id JOIN dbo.usuario u ON u.id=m.usuario_id
-            ORDER BY m.fecha DESC,m.id DESC
-            """:"""
-            SELECT m.gestion_id,m.fecha,t.serie articulo,m.tipo,COALESCE(b.nombre,bo.nombre,'') bodega,1 cantidad,u.login
-            FROM dbo.movimiento_pos m JOIN dbo.terminal t ON t.id=m.terminal_id
-            LEFT JOIN dbo.bodega b ON b.id=m.bodega_destino_id
-            LEFT JOIN dbo.bodega bo ON bo.id=m.bodega_origen_id
-            JOIN dbo.usuario u ON u.id=m.usuario_id ORDER BY m.fecha DESC,m.id DESC
-            """;
-        var filas=jdbc.query(consulta,(r,n)->{
-            LocalDateTime momento=r.getTimestamp("fecha").toLocalDateTime();
-            return new Fila(r.getLong("gestion_id"),momento.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")),
-                momento.format(DateTimeFormatter.ofPattern("HH:mm")),r.getString("articulo"),r.getString("tipo"),
-                r.getString("bodega"),r.getInt("cantidad"),r.getString("login"),momento.toLocalDate());
-        });
+        var filas=new java.util.ArrayList<Fila>();
+        if(materiales) {
+            for(var m:materialesRepository.findAllByOrderByFechaDescIdDesc()) {
+                filas.add(fila(m.getGestion().getId(),m.getFecha(),m.getMaterial().getNombre(),m.getTipo(),
+                    m.getBodega().getNombre(),m.getCantidad(),m.getUsuario().getLogin()));
+            }
+        } else {
+            for(var m:pos.findAllByOrderByFechaDescIdDesc()) {
+                var almacen=m.getBodegaDestino()!=null?m.getBodegaDestino():m.getBodegaOrigen();
+                filas.add(fila(m.getGestion().getId(),m.getFecha(),m.getTerminal().getSerie(),m.getTipo(),
+                    almacen==null?"":almacen.getNombre(),1,m.getUsuario().getLogin()));
+            }
+        }
         var bodegas=new TreeSet<String>();
         var tipos=new TreeSet<String>();
         filas.forEach(f->{bodegas.add(f.bodega());tipos.add(f.detalle());});
@@ -65,4 +66,7 @@ public class HistorialSqlController {
         modelo.addAttribute("fecha",fecha);
         return "historial";
     }
-}
+    private Fila fila(long gestion,LocalDateTime fecha,String articulo,String tipo,String bodega,int cantidad,String usuario) {
+        return new Fila(gestion,fecha.format(DateTimeFormatter.ofPattern("dd-MM-yyyy")),
+            fecha.format(DateTimeFormatter.ofPattern("HH:mm")),articulo,tipo,bodega,cantidad,usuario,fecha.toLocalDate());
+    }}
